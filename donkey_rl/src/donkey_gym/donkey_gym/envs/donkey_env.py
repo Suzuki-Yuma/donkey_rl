@@ -13,7 +13,7 @@ from donkey_gym.envs.donkey_sim import DonkeyUnitySim
 
 class DonkeyEnv(gym.Env):
     """
-    Customized OpenAI Gym Environment for Donkey 
+    Customized OpenAI Gym Environment for Donkey
     """
 
     metadata = {
@@ -45,7 +45,7 @@ class DonkeyEnv(gym.Env):
 
         # Launch Unity environment
         file_name = "donkey" # file name to identify Unity application
-        headless = False  # Set to True to render Unity environment. False for headless training
+        headless = True  # Set to True to render Unity environment. False for headless training
         platform = "linux" # linux or darwin (for MaxOS)
         self.viewer.executable_launcher(file_name, headless, platform)
 

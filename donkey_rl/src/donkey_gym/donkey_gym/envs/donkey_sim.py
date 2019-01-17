@@ -39,7 +39,7 @@ class DonkeyUnitySim(object):
 
         # sensor size - height, width, depth
         self.camera_img_size=(120, 160, 3)
-        
+
         self.app = Flask("DonkeyUnitySim")
 
         self.reset(intial=True)
@@ -67,9 +67,10 @@ class DonkeyUnitySim(object):
         return self.camera_img_size
 
     def take_action(self, action):
+        self.steering_angle, self.throttle = action
         self.wait_for_obs = True
         self.have_new_obs = False
-        self.send_control(action[0], action[1])        
+        self.send_control(action[0], action[1])
 
     def observe(self):
         assert(self.wait_for_obs)
@@ -100,7 +101,7 @@ class DonkeyUnitySim(object):
         """
         Define end of episode
         """
-        # Use car collision as done signal. 
+        # Use car collision as done signal.
         # A better termination might be when the car deviates from the track
         #return self.hit != "none"
 
@@ -116,7 +117,7 @@ class DonkeyUnitySim(object):
         if abs(self.cte) > self.CTE_MAX_ERR:
             return -1.0
 
-        return 1.0 - (abs(self.cte) / self.CTE_MAX_ERR)
+        return (1.0 - (abs(self.cte) / self.CTE_MAX_ERR)) * self.throttle
 
 
     ## ------ Launch Unity Env ----------- ##
@@ -244,7 +245,7 @@ class DonkeyUnitySim(object):
     def send_get_scene_names(self):
         sio.emit(
             "GetSceneNames",
-            data={            
+            data={
             },
             skip_sid=True)
 
@@ -277,7 +278,7 @@ class DonkeyUnitySim(object):
     def send_reset_car(self):
         sio.emit(
             "ResetCar",
-            data={            
+            data={
             },
             skip_sid=True)
 
@@ -286,7 +287,3 @@ class DonkeyUnitySim(object):
             "Settings",
             data=prefs,
             skip_sid=True)
-
-
-
-
