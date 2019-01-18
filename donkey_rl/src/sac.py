@@ -4,7 +4,7 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-import skimage as skimage
+import skimage
 from skimage import transform, color, exposure
 from skimage.transform import rotate
 from skimage.viewer import ImageViewer
@@ -17,7 +17,7 @@ from torch.distributions import Normal
 import donkey_gym
 import my_cv
 
-EPISODES = 200
+EPISODES = 1000
 img_rows , img_cols = 80, 80
 # Convert image into Black and white
 img_channels = 4 # We stack 4 frames
@@ -101,7 +101,7 @@ class SACAgent:
         self.train_start = 1000
         self.tau = 0.001
 
-        self.memory = deque(maxlen=1000000)
+        self.memory = deque(maxlen=50000)
 
         self.policy = TanGaussianPolicy(action_dim=action_size)
         self.qf = Qfunc(action_dim=action_size)

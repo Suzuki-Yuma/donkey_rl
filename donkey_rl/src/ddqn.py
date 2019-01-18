@@ -4,8 +4,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-import skimage as skimage
-import skimage as skimage
+import skimage
 from skimage import transform, color, exposure
 from skimage.transform import rotate
 from skimage.viewer import ImageViewer
@@ -24,7 +23,7 @@ from keras import backend as K
 import donkey_gym
 import my_cv
 
-EPISODES = 200
+EPISODES = 100
 img_rows , img_cols = 80, 80
 # Convert image into Black and white
 img_channels = 4 # We stack 4 frames
@@ -59,7 +58,7 @@ class DQNAgent:
         self.explore = 10000
 
         # Create replay memory using deque
-        self.memory = deque(maxlen=1000000)
+        self.memory = deque(maxlen=50000)
 
         # Create main model and target model
         self.model = self.build_model()
