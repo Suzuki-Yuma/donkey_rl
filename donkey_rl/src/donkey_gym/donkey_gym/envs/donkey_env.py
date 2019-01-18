@@ -28,7 +28,7 @@ class DonkeyEnv(gym.Env):
         self.viewer = DonkeyUnitySim(level, time_step)
 
         # Steering and Throttle
-        self.action_space = spaces.Discrete(len(self.ACTION))
+        self.action_space = spaces.Box(-1., 1., (len(self.ACTION), ))
 
         # Camera sensor data
         self.observation_space = spaces.Box(0, 255, self.viewer.get_sensor_size())
@@ -45,7 +45,7 @@ class DonkeyEnv(gym.Env):
 
         # Launch Unity environment
         file_name = "donkey" # file name to identify Unity application
-        headless = True  # Set to True to render Unity environment. False for headless training
+        headless = False  # Set to True to render Unity environment. False for headless training
         platform = "linux" # linux or darwin (for MaxOS)
         self.viewer.executable_launcher(file_name, headless, platform)
 
