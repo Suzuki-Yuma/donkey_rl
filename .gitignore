@@ -111,6 +111,8 @@ venv.bak/
 *.json
 *.pyc
 *.h5
+*.npy
+*.pt
 donkey_rl/sdsim/Library
 donkey_rl/sdsim/log/*
 donkey_rl/sdsim/obj
