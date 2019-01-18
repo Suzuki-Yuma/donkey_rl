@@ -2,6 +2,7 @@ import sys
 import gym
 import random
 import numpy as np
+import matplotlib.pyplot as plt
 import cv2
 import skimage as skimage
 import skimage as skimage
@@ -23,7 +24,7 @@ from keras import backend as K
 import donkey_gym
 import my_cv
 
-EPISODES = 10000
+EPISODES = 200
 img_rows , img_cols = 80, 80
 # Convert image into Black and white
 img_channels = 4 # We stack 4 frames
@@ -34,6 +35,7 @@ class DQNAgent:
         self.t = 0
         self.max_Q = 0
         self.train = True
+        self.load = False
         self.lane_detection = False # Set to True to train on images with segmented lane lines
 
         # Get size of state and action
@@ -46,16 +48,18 @@ class DQNAgent:
         if (self.train):
             self.epsilon = 1.0
             self.initial_epsilon = 1.0
+            #self.epsilon = 0.5
+            #self.initial_epsilon = 0.5
         else:
             self.epsilon = 1e-6
             self.initial_epsilon = 1e-6
         self.epsilon_min = 0.02
         self.batch_size = 64
-        self.train_start = 100
+        self.train_start = 1000
         self.explore = 10000
 
         # Create replay memory using deque
-        self.memory = deque(maxlen=10000)
+        self.memory = deque(maxlen=1000000)
 
         # Create main model and target model
         self.model = self.build_model()
@@ -79,7 +83,7 @@ class DQNAgent:
         model.add(Activation('relu'))
 
         # 15 categorical bins for Steering angles
-        model.add(Dense(15, activation="linear")) 
+        model.add(Dense(15, activation="linear"))
 
         adam = Adam(lr=self.learning_rate)
         model.compile(loss='mse',optimizer=adam)
@@ -131,7 +135,7 @@ class DQNAgent:
                     pass
 
             return ret_img
-        
+
 
     def update_target_model(self):
         self.target_model.set_weights(self.model.get_weights())
@@ -158,7 +162,7 @@ class DQNAgent:
     def train_replay(self):
         if len(self.memory) < self.train_start:
             return
-        
+
         batch_size = min(self.batch_size, len(self.memory))
         minibatch = random.sample(self.memory, batch_size)
 
@@ -234,15 +238,17 @@ if __name__ == "__main__":
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
-    action_size = env.action_space.n # Steering and Throttle
+    action_size = env.action_space.low.size # Steering and Throttle
 
     agent = DQNAgent(state_size, action_size)
 
     throttle = 0.3 # Set throttle as constant value
 
     episodes = []
+    episode_lens = []
+    returns = []
 
-    if not agent.train:
+    if agent.load:
         print("Now we load the saved model")
         agent.load_model("./save_model/save_model.h5")
 
@@ -254,13 +260,14 @@ if __name__ == "__main__":
         obs = env.reset()
 
         episode_len = 0
-       
+        total_reward = 0.
+
         x_t = agent.process_image(obs)
 
         s_t = np.stack((x_t,x_t,x_t,x_t),axis=2)
         # In Keras, need to reshape
-        s_t = s_t.reshape(1, s_t.shape[0], s_t.shape[1], s_t.shape[2]) #1*80*80*4       
-        
+        s_t = s_t.reshape(1, s_t.shape[0], s_t.shape[1], s_t.shape[2]) #1*80*80*4
+
         while not done:
 
             # Get action for the current state and go one step in environment
@@ -282,8 +289,8 @@ if __name__ == "__main__":
             s_t = s_t1
             agent.t = agent.t + 1
             episode_len = episode_len + 1
-            if agent.t % 30 == 0:
-                print("EPISODE",  e, "TIMESTEP", agent.t,"/ ACTION", action, "/ REWARD", reward, "/ EPISODE LENGTH", episode_len, "/ Q_MAX " , agent.max_Q)
+            total_reward += reward
+            print("\rEPISODE {0} TIMESTEP {1} / RETURN {2} / EPISODE LENGTH {3}".format(e, agent.t, total_reward, episode_len), end="")
 
             if done:
 
@@ -291,12 +298,20 @@ if __name__ == "__main__":
                 agent.update_target_model()
 
                 episodes.append(e)
-                
+
+                episode_lens.append(episode_len)
+                returns.append(total_reward)
 
                 # Save model for each episode
                 if agent.train:
+                    np.save("./save_model/episode_len.npy", np.asarray(episode_lens))
+                    np.save("./save_model/returns.npy", np.asarray(returns))
                     agent.save_model("./save_model/save_model.h5")
 
-                print("episode:", e, "  memory length:", len(agent.memory),
-                      "  epsilon:", agent.epsilon, " episode length:", episode_len)
-
+                print("\nepisode:", e, "  memory length:", len(agent.memory),
+                      "  epsilon:", agent.epsilon, " episode length:", episode_len, " Return:", total_reward)
+    plt.plot(returns)
+    plt.xlabel("Episode")
+    plt.ylabel("Return")
+    plt.title("Return Curve by DDQN")
+    plt.show()
