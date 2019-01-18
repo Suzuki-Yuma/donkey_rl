@@ -28,15 +28,15 @@ class TanGaussianPolicy(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=img_channels, out_channels=32, kernel_size=8, stride=4)
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2)
         self.conv3 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1)
-        self.linear1 = nn.Linear(512)
-        self.linear_for_mu = nn.Linear(action_dim)
-        self.linear_for_sigma = nn.Linear(action_dim)
+        self.linear1 = nn.Linear(6*6*64, 512)
+        self.linear_for_mu = nn.Linear(512, action_dim)
+        self.linear_for_sigma = nn.Linear(512, action_dim)
 
     def forward(self, state):
         h = F.relu(self.conv1(state))
         h = F.relu(self.conv2(h))
         h = F.relu(self.conv3(h))
-        h = h.view(-1, 512)
+        h = h.view(-1, 6*6*64)
         h = F.relu(self.linear1(h))
         mu = self.linear_for_mu(h)
         log_sigma = self.linear_for_sigma(h)
@@ -53,19 +53,18 @@ class TanGaussianPolicy(nn.Module):
 class Qfunc(nn.Module):
     def __init__(self, action_dim):
         super(Qfunc, self).__init__()
-        self.action_dim = action_dim
         self.conv1 = nn.Conv2d(in_channels=img_channels, out_channels=32, kernel_size=8, stride=4)
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2)
         self.conv3 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1)
-        self.linear1 = nn.Linear(512)
-        self.linear2 = nn.Linear(1)
+        self.linear1 = nn.Linear(6*6*64+action_dim, 512)
+        self.linear2 = nn.Linear(512, 1)
 
     def forward(self, state, action):
         h = F.relu(self.conv1(state))
         h = F.relu(self.conv2(h))
         h = F.relu(self.conv3(h))
-        h = h.view(-1, 512 - self.action_dim)
-        h = F.relu(self.linear1(torch.cat((h, action))))
+        h = h.view(-1, 6*6*64)
+        h = F.relu(self.linear1(torch.cat((h, action), dim=1)))
         h = self.linear2(h)
         return h
 
@@ -75,14 +74,14 @@ class Vfunc(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=img_channels, out_channels=32, kernel_size=8, stride=4)
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2)
         self.conv3 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1)
-        self.linear1 = nn.Linear(512)
-        self.linear2 = nn.Linear(1)
+        self.linear1 = nn.Linear(6*6*64, 512)
+        self.linear2 = nn.Linear(512, 1)
 
     def forward(self, state):
         h = F.relu(self.conv1(state))
         h = F.relu(self.conv2(h))
         h = F.relu(self.conv3(h))
-        h = h.view(-1, 512)
+        h = h.view(-1, 6*6*64)
         h = F.relu(self.linear1(h))
         h = self.linear2(h)
         return h
@@ -136,8 +135,9 @@ class SACAgent:
             target.data.copy_(target.data * (1. - self.tau) + source * self.tau)
 
     def get_action(self, s_t):
-        action, _ = self.policy(s_t)
-        return action.numpy()
+        s_t_torch = torch.tensor(s_t)
+        action, _ = self.policy(s_t_torch)
+        return action.detach().numpy()
 
     def replay_memory(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -150,11 +150,11 @@ class SACAgent:
         minibatch = random.sample(self.memory, batch_size)
 
         state_t, action_t, reward_t, state_t1, terminal = zip(*minibatch)
-        state_t = np.concatenate(state_t)
-        action_t = np.concatenate(action_t)
-        state_t1 = np.concatenate(state_t1)
-        reward_t = np.concatenate(reward_t)
-        terminal = np.concatenate(terminal)
+        state_t = torch.tensor(np.concatenate(state_t))
+        action_t = torch.tensor(np.concatenate(action_t))
+        state_t1 = torch.tensor(np.concatenate(state_t1))
+        reward_t = torch.tensor(np.asarray(reward_t).astype(np.float32))
+        terminal = torch.tensor(np.asarray(terminal).astype(np.float32))
 
         q_pred = self.qf(state_t, action_t)
         v_pred = self.vf(state_t)
@@ -213,20 +213,24 @@ if __name__ == "__main__":
 
         x_t = agent.process_image(obs)
 
-        s_t = np.stack((x_t,x_t,x_t,x_t),axis=2)
+        s_t = np.stack((x_t,x_t,x_t,x_t),axis=0)
+        s_t = s_t.reshape(1, 4, img_cols, img_rows).astype(np.float32)
 
         while not done:
 
             # Get action for the current state and go one step in environment
             action = agent.get_action(s_t)
-            next_obs, reward, done, info = env.step(action)
+            real_action = (action[0] + 1) / 2. * (env.action_space.high - env.action_space.low) + env.action_space.low
+            next_obs, reward, done, info = env.step(real_action)
 
             x_t1 = agent.process_image(next_obs)
 
-            s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3) #1x80x80x4
+            x_t1 = x_t1.reshape(1, 1, img_cols, img_rows)
+
+            s_t1 = np.append(x_t1, s_t[:, :3, :, :], axis=1).astype(np.float32) #1x80x80x4
 
             # Save the sample <s, a, r, s'> to the replay memory
-            agent.replay_memory(s_t, action, reward, s_t1, done)
+            agent.replay_memory(s_t, action, reward, s_t1, int(done))
 
             if agent.train:
                 agent.train_replay()
@@ -257,7 +261,7 @@ if __name__ == "__main__":
                     torch.save(agent.target_vf.state_dict(), "./save_model/sac/sac_target_vf.pt")
 
                 print("\nepisode:", e, "  memory length:", len(agent.memory),
-                      "  epsilon:", agent.epsilon, " episode length:", episode_len, " Return:", total_reward)
+                      " episode length:", episode_len, " Return:", total_reward)
     plt.plot(returns)
     plt.xlabel("Episode")
     plt.ylabel("Return")

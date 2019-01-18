@@ -28,7 +28,7 @@ class DonkeyEnv(gym.Env):
         self.viewer = DonkeyUnitySim(level, time_step)
 
         # Steering and Throttle
-        self.action_space = spaces.Box(-1., 1., (len(self.ACTION), ))
+        self.action_space = spaces.Box(np.array([-1., 0.]),  np.array([1., 1.]))
 
         # Camera sensor data
         self.observation_space = spaces.Box(0, 255, self.viewer.get_sensor_size())

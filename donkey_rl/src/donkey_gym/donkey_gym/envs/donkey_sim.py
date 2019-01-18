@@ -55,6 +55,8 @@ class DonkeyUnitySim(object):
         self.x = 0.0
         self.y = 0.0
         self.z = 0.0
+        self.steering_angle = 0.
+        self.throttle = 0.
         self.loaded = False
         self.wait_for_obs = True
         self.have_new_obs = False
@@ -106,7 +108,9 @@ class DonkeyUnitySim(object):
         #return self.hit != "none"
 
         if abs(self.cte) > self.CTE_MAX_ERR or self.hit != "none":
-            return -1.0
+            return True
+        else:
+            return False
 
     ## ------ RL interface ----------- ##
 
