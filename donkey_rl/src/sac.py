@@ -167,7 +167,7 @@ class SACAgent:
         terminal = torch.tensor(np.asarray(terminal).astype(np.float32))
 
         q_pred = self.qf(state_t, action_t)
-        new_action, log_pi, _, _ = self.policy(state_t)
+        new_action, log_pi, mu, sigma = self.policy(state_t)
         new_action_t1, log_pi_t1, _, _ = self.policy(state_t1)
 
         target_v_value = self.target_qf(state_t1, new_action_t1) - log_pi_t1
@@ -175,7 +175,7 @@ class SACAgent:
         qf_loss = self.qf_criterion(q_pred, q_target.detach())
 
         q_new_action = self.qf(state_t, new_action)
-        policy_loss = (log_pi - q_new_action).mean()
+        policy_loss = (log_pi - q_new_action).mean() + 1e-3 * ((sigma**2).mean())
 
         self.qf_optimizer.zero_grad()
         qf_loss.backward()
