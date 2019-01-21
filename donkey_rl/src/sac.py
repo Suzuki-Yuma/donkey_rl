@@ -101,8 +101,8 @@ class SACAgent:
 
     def __init__(self, state_size, action_size):
         self.t = 0
-        self.train = True
-        self.load = False
+        self.train = False
+        self.load = True
 
         self.state_size = state_size
         self.action_size = action_size
@@ -218,6 +218,8 @@ if __name__ == "__main__":
 
     if agent.load:
         print("Now we load the saved model")
+        agent.policy.load_state_dict(torch.load("./save_model/sac/sac_policy.pt"))
+        agent.qf.load_state_dict(torch.load("./save_model/sac/sac_qf.pt"))
 
 
     for e in range(EPISODES):
@@ -238,9 +240,17 @@ if __name__ == "__main__":
         while not done:
 
             # Get action for the current state and go one step in environment
-            action, mu, sigma = agent.get_action(s_t)
-            mus.append(mu.mean())
-            sigmas.append(sigma.mean())
+            if agent.train:
+                action, mu, sigma = agent.get_action(s_t)
+                mus.append(mu.mean())
+                sigmas.append(sigma.mean())
+            else:
+                with torch.no_grad():
+                    temp_s_t = torch.tensor(s_t).repeat(100, 1, 1, 1)
+                    actions, _, _, _ = agent.policy(temp_s_t)
+                    q_values = agent.qf(temp_s_t, actions)
+                    action = actions[torch.argmax(q_values)].numpy()
+
             real_action = (action[0] + 1) / 2. * (env.action_space.high - env.action_space.low) + env.action_space.low
             next_obs, reward, done, info = env.step(real_action)
 
